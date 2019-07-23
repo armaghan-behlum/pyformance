@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
+from six import iteritems
 import base64
 import logging
+import re
 
 try:
     from urllib2 import quote, urlopen, Request, URLError
@@ -11,6 +13,7 @@ except ImportError:
     from urllib.request import urlopen, Request
 
 from .reporter import Reporter
+from copy import copy
 
 LOG = logging.getLogger(__name__)
 
@@ -42,6 +45,7 @@ class InfluxReporter(Reporter):
         protocol=DEFAULT_INFLUX_PROTOCOL,
         autocreate_database=False,
         clock=None,
+        global_tags=None,
     ):
         super(InfluxReporter, self).__init__(registry, reporting_interval, clock)
         self.prefix = prefix
@@ -53,6 +57,11 @@ class InfluxReporter(Reporter):
         self.server = server
         self.autocreate_database = autocreate_database
         self._did_create_database = False
+
+        if global_tags is None:
+            self.global_tags = {}
+        else:
+            self.global_tags = global_tags
 
     def _create_database(self):
         url = "%s://%s:%s/query" % (self.protocol, self.server, self.port)
@@ -78,33 +87,88 @@ class InfluxReporter(Reporter):
         if self.autocreate_database and not self._did_create_database:
             self._create_database()
         timestamp = timestamp or int(round(self.clock.time()))
-        metrics = (registry or self.registry).dump_metrics()
-        post_data = []
+        metrics = (registry or self.registry).dump_metrics(key_is_metric=True)
+        post_data = "\n".join(self._get_influx_protocol_lines(metrics, timestamp))
+        url = self._get_url()
+        self._try_send(url, post_data)
+
+    def _get_table_name(self, metric_key):
+        if not self.prefix:
+            return metric_key
+        else:
+            return "%s.%s" % (self.prefix, metric_key)
+
+    def _get_influx_protocol_lines(self, metrics, timestamp):
+        lines = []
         for key, metric_values in metrics.items():
-            if not self.prefix:
-                table = key
-            else:
-                table = "%s.%s" % (self.prefix, key)
-            values = ",".join(
+            metric_name = key.get_key()
+            table = self._get_table_name(metric_name)
+            values = InfluxReporter._stringify_values(metric_values)
+            tags = self._stringify_tags(key)
+            line = "%s%s %s %s" % (table, tags, values, timestamp)
+            lines.append(line)
+        return lines
+
+    @staticmethod
+    def _stringify_values(metric_values):
+        return ",".join(
+            [
+                "%s=%s" % (k, _format_field_value(v))
+                for (k, v) in iteritems(metric_values) if k != "tags"
+            ]
+        )
+
+    def _stringify_tags(self, metric):
+        # start with the global reporter tags
+        # (copy to avoid mutating to global values)
+        all_tags = copy(self.global_tags)
+
+        # add the local tags on top of those
+        tags = metric.get_tags()
+        all_tags.update(tags)
+
+        if all_tags:
+            return "," + ",".join(
                 [
-                    "%s=%s" % (k, v if type(v) is not str else '"{}"'.format(v))
-                    for (k, v) in metric_values.items()
+                    "%s=%s" % (k, _format_tag_value(v))
+                    for (k, v) in iteritems(all_tags)
                 ]
             )
-            line = "%s %s %s" % (table, values, timestamp)
-            post_data.append(line)
-        post_data = "\n".join(post_data)
+
+        return ""
+
+    def _get_url(self):
         path = "/write?db=%s&precision=s" % self.database
-        url = "%s://%s:%s%s" % (self.protocol, self.server, self.port, path)
-        request = Request(url, post_data.encode("utf-8"))
+        return "%s://%s:%s%s" % (self.protocol, self.server, self.port, path)
+
+    def _add_auth_data(self, request):
+        auth = _encode_username(self.username, self.password)
+        request.add_header("Authorization", "Basic %s" % auth.decode('utf-8'))
+
+    def _try_send(self, url, data):
+        request = Request(url, data.encode("utf-8"))
         if self.username:
-            auth = _encode_username(self.username, self.password)
-            request.add_header("Authorization", "Basic %s" % auth.decode("utf-8"))
+            self._add_auth_data(request)
         try:
             response = urlopen(request)
             response.read()
         except URLError as err:
             LOG.warning("Cannot write to %s: %s", self.server, err.reason)
+
+
+def _format_field_value(value):
+    if type(value) is not str:
+        return value
+    else:
+        return '"{}"'.format(value)
+
+
+def _format_tag_value(value):
+    if type(value) is not str:
+        return value
+    else:
+        # Escape special characters
+        return re.sub("([ ,=])", r"\\\1", value)
 
 
 def _encode_username(username, password):

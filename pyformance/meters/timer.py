@@ -1,4 +1,5 @@
 import time
+from .base_metric import BaseMetric
 
 try:
     from blinker import Namespace
@@ -14,7 +15,7 @@ else:
     call_too_long = None
 
 
-class Timer(object):
+class Timer(BaseMetric):
 
     """
     A timer metric which aggregates timing durations and provides duration statistics, plus
@@ -24,16 +25,25 @@ class Timer(object):
 
     def __init__(
         self,
+        key,
         threshold=None,
         size=DEFAULT_SIZE,
         alpha=DEFAULT_ALPHA,
         clock=time,
         sink=None,
         sample=None,
+        tags=None
     ):
-        super(Timer, self).__init__()
-        self.meter = Meter(clock=clock)
-        self.hist = Histogram(size=size, alpha=alpha, clock=clock, sample=sample)
+        super(Timer, self).__init__(key, tags)
+        self.meter = Meter(key=key, tags=tags, clock=clock)
+        self.hist = Histogram(
+            key=key,
+            tags=tags,
+            size=size,
+            alpha=alpha,
+            clock=clock,
+            sample=sample
+        )
         self.sink = sink
         self.threshold = threshold
 
