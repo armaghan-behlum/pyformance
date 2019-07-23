@@ -70,6 +70,25 @@ class TestInfluxReporter(TimedTestCase):
                             self.clock.time_string()
             send_mock.assert_called_once_with(expected_url, expected_data)
 
+    def test_gauge_with_global_tags(self):
+        tags = {"region": "us - west"}
+        self.registry.gauge(key="cpu", tags=tags).set_value(65)
+        influx_reporter = InfluxReporter(
+            registry=self.registry,
+            clock=self.clock,
+            autocreate_database=False,
+            global_tags={"stage": "dev", "region": "override"}
+        )
+
+        with mock.patch.object(influx_reporter, "_try_send",
+                               wraps=influx_reporter._try_send) as send_mock:
+            influx_reporter.report_now()
+
+            expected_url = "http://127.0.0.1:8086/write?db=metrics&precision=s"
+            expected_data = "cpu,region=us\\ -\\ west,stage=dev value=65 " + \
+                            self.clock.time_string()
+            send_mock.assert_called_once_with(expected_url, expected_data)
+
     def test_counter_with_tags(self):
         tags = {"host": "server1"}
         counter = self.registry.counter(key="cpu", tags=tags)

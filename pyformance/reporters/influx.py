@@ -13,6 +13,7 @@ except ImportError:
     from urllib.request import urlopen, Request
 
 from .reporter import Reporter
+from copy import copy
 
 LOG = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class InfluxReporter(Reporter):
         protocol=DEFAULT_INFLUX_PROTOCOL,
         autocreate_database=False,
         clock=None,
+        global_tags=None,
     ):
         super(InfluxReporter, self).__init__(registry, reporting_interval, clock)
         self.prefix = prefix
@@ -55,6 +57,11 @@ class InfluxReporter(Reporter):
         self.server = server
         self.autocreate_database = autocreate_database
         self._did_create_database = False
+
+        if global_tags is None:
+            self.global_tags = {}
+        else:
+            self.global_tags = global_tags
 
     def _create_database(self):
         url = "%s://%s:%s/query" % (self.protocol, self.server, self.port)
@@ -97,7 +104,7 @@ class InfluxReporter(Reporter):
             metric_name = key.get_key()
             table = self._get_table_name(metric_name)
             values = InfluxReporter._stringify_values(metric_values)
-            tags = InfluxReporter._stringify_tags(key)
+            tags = self._stringify_tags(key)
             line = "%s%s %s %s" % (table, tags, values, timestamp)
             lines.append(line)
         return lines
@@ -111,14 +118,20 @@ class InfluxReporter(Reporter):
             ]
         )
 
-    @staticmethod
-    def _stringify_tags(metric):
+    def _stringify_tags(self, metric):
+        # start with the global reporter tags
+        # (copy to avoid mutating to global values)
+        all_tags = copy(self.global_tags)
+
+        # add the local tags on top of those
         tags = metric.get_tags()
-        if tags:
+        all_tags.update(tags)
+
+        if all_tags:
             return "," + ",".join(
                 [
                     "%s=%s" % (k, _format_tag_value(v))
-                    for (k, v) in iteritems(tags)
+                    for (k, v) in iteritems(all_tags)
                 ]
             )
 
