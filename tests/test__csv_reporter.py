@@ -1,12 +1,6 @@
-import sys
 import os
 import shutil
 import tempfile
-
-if sys.version_info[0] < 3:
-    from StringIO import StringIO
-else:
-    from io import StringIO
 
 from pyformance import MetricsRegistry
 from pyformance.reporters.csv_reporter import CsvReporter
@@ -30,11 +24,20 @@ class TestCsvReporter(TimedTestCase):
         g1 = self.registry.gauge("gauge1")
         g1.set_value(123)
 
+        # CSV reporter is extremely simple, doesn't have a metric name or
+        # field name definition, meaning it'll be useless for tracking events that may have several
+        # different values for different fields for the same timestamp
+
+        # So expected behaviour here is just ignore the events, doubt anyone will find such simple
+        # implementation useful in any case.
+        e1 = self.registry.event("e1")
+        e1.add({"field": 1})
+
         with CsvReporter(
-            registry=self.registry,
-            reporting_interval=1,
-            clock=self.clock,
-            path=self.path,
+                registry=self.registry,
+                reporting_interval=1,
+                clock=self.clock,
+                path=self.path,
         ) as r:
             r.report_now()
 

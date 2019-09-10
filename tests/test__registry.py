@@ -1,5 +1,5 @@
 from pyformance import MetricsRegistry, time_calls, timer
-from pyformance.meters import Meter, BaseMetric
+from pyformance.meters import Meter, BaseMetric, EventPoint
 from tests import TimedTestCase
 from pyformance.decorators import get_qualname
 
@@ -57,6 +57,23 @@ class RegistryTestCase(TimedTestCase):
             {BaseMetric("test_counter", {"tag1": "val1"}): {"count": 1}}
         )
 
+    def test_dump_events(self):
+        self.registry.event("test_event", {"tag1": "val1"}).add({"field": 1})
+
+        self.assertEqual(self.registry.dump_metrics(key_is_metric=True), {
+            BaseMetric("test_event", {"tag1": "val1"}): {
+                "events": [EventPoint(
+                    time=self.clock.time(),
+                    values={"field": 1}
+                )]
+            }
+        })
+
+        # Make sure the same event is never dumped twice
+        self.assertEqual(self.registry.dump_metrics(key_is_metric=True), {
+            BaseMetric("test_event", {"tag1": "val1"}): {}
+        })
+
     def test_time_calls_with_registry(self):
         registry = MetricsRegistry()
 
@@ -66,8 +83,10 @@ class RegistryTestCase(TimedTestCase):
 
         timed_func()
 
-        stats = registry.get_metrics(key="timed_func_calls", tags={"tag1": "val1"})
-        print(registry.get_metrics(key="timed_func_calls", tags={"tag1": "val1"}))
+        metric_name = "RegistryTestCase.test_time_calls_with_registry.<locals>.timed_func_calls"
+
+        stats = registry.get_metrics(key=metric_name, tags={"tag1": "val1"})
+        print(registry.get_metrics(key=metric_name, tags={"tag1": "val1"}))
         self.assertEqual(stats["count"], 1)
         self.assertTrue(stats["mean_rate"])
 
@@ -77,7 +96,7 @@ class RegistryTestCase(TimedTestCase):
             pass
 
         timed_func()
-        func_timer = timer("timed_func_calls")
+        func_timer = timer("RegistryTestCase.test_time_calls.<locals>.timed_func_calls")
         self.assertEqual(func_timer.get_count(), 1)
         self.assertTrue(func_timer.get_mean())
 
@@ -85,4 +104,4 @@ class RegistryTestCase(TimedTestCase):
         def foo():
             pass
 
-        self.assertEqual(get_qualname(foo), "foo")
+        self.assertEqual(get_qualname(foo), "RegistryTestCase.test_get_qualname.<locals>.foo")

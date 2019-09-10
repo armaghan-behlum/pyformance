@@ -1,10 +1,12 @@
 import re
 import time
-from .meters import Counter, Histogram, Meter, Timer, Gauge, CallbackGauge, SimpleGauge, BaseMetric
+from typing import Dict
+
+from .meters import BaseMetric, CallbackGauge, Counter, Event, Gauge, Histogram, Meter, \
+    SimpleGauge, Timer
 
 
 class MetricsRegistry(object):
-
     """
     A single interface used to gather metrics on a service. It keeps track of
     all the relevant Counters, Meters, Histograms, and Timers. It does not have
@@ -21,6 +23,7 @@ class MetricsRegistry(object):
         self._counters = {}
         self._histograms = {}
         self._gauges = {}
+        self._events = {}
         self._clock = clock
 
     def add(self, key, metric, tags=None):
@@ -42,6 +45,7 @@ class MetricsRegistry(object):
             (Gauge, self._gauges),
             (Timer, self._timers),
             (Counter, self._counters),
+            (Event, self._events),
         )
         for cls, registry in class_map:
             if isinstance(metric, cls):
@@ -144,11 +148,28 @@ class MetricsRegistry(object):
             )
         return self._timers[metric_key]
 
+    def event(self, key: str, tags: Dict[str, str] = None) -> Event:
+        """
+        Gets an event reporter based on key and tags
+        :param key: The metric name / measurement name
+        :param tags: Tags to attach to the metric
+        :return: Event object you can add readings to
+        """
+        metric_key = BaseMetric(key, tags)
+        if metric_key not in self._events:
+            self._events[metric_key] = Event(
+                clock=self._clock,
+                key=key,
+                tags=tags
+            )
+        return self._events[metric_key]
+
     def clear(self):
         self._meters.clear()
         self._counters.clear()
         self._gauges.clear()
         self._timers.clear()
+        self._events.clear()
         self._histograms.clear()
 
     def _get_counter_metrics(self, metric_key):
@@ -196,6 +217,19 @@ class MetricsRegistry(object):
             return res
         return {}
 
+    def _get_event_metrics(self, metric_key):
+        if metric_key in self._events:
+            _event = self._events[metric_key]
+            points = _event.get_events()
+
+            if points:
+                res = {
+                    "events": points
+                }
+
+                return res
+        return {}
+
     def _get_timer_metrics(self, metric_key):
         if metric_key in self._timers:
             timer = self._timers[metric_key]
@@ -237,11 +271,12 @@ class MetricsRegistry(object):
     def _get_metrics_by_metric_key(self, metric_key):
         metrics = {}
         for getter in (
-            self._get_counter_metrics,
-            self._get_histogram_metrics,
-            self._get_meter_metrics,
-            self._get_timer_metrics,
-            self._get_gauge_metrics,
+                self._get_counter_metrics,
+                self._get_histogram_metrics,
+                self._get_meter_metrics,
+                self._get_timer_metrics,
+                self._get_gauge_metrics,
+                self._get_event_metrics,
         ):
             metrics.update(getter(metric_key))
         return metrics
@@ -257,11 +292,12 @@ class MetricsRegistry(object):
         """
         metrics = {}
         for metric_type in (
-            self._counters,
-            self._histograms,
-            self._meters,
-            self._timers,
-            self._gauges,
+                self._counters,
+                self._histograms,
+                self._meters,
+                self._timers,
+                self._gauges,
+                self._events,
         ):
             for metric_key in metric_type.keys():
                 if key_is_metric:
@@ -271,12 +307,15 @@ class MetricsRegistry(object):
 
                 metrics[key] = self._get_metrics_by_metric_key(metric_key)
 
+        # Don't repeat events, that's the whole point of events
+        for _event in self._events.values():
+            _event.clear()
+
         return metrics
 
 
 # TODO make sure tags are supported properly
 class RegexRegistry(MetricsRegistry):
-
     """
     A single interface used to gather metrics on a service. This class uses a regex to combine
     measures that match a pattern. For example, if you have a REST API, instead of defining
@@ -346,6 +385,10 @@ def meter(key, tags=None):
 
 def timer(key, tags=None):
     return _global_registry.timer(key, tags)
+
+
+def event(key, tags=None):
+    return _global_registry.event(key, tags)
 
 
 def gauge(key, gauge=None, tags=None):

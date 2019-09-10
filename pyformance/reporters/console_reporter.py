@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-import sys
+
 import datetime
+import sys
+
 from .reporter import Reporter
 
 
 class ConsoleReporter(Reporter):
-
     """
     Show metrics in a human readable form.
     This is useful for debugging if you want to read the current state on the console.
     """
 
     def __init__(
-        self, registry=None, reporting_interval=30, stream=sys.stderr, clock=None
+            self, registry=None, reporting_interval=30, stream=sys.stderr, clock=None
     ):
         super(ConsoleReporter, self).__init__(registry, reporting_interval, clock)
         self.stream = stream
@@ -33,8 +34,25 @@ class ConsoleReporter(Reporter):
         ]
         for key in metrics.keys():
             values = metrics[key]
-            metrics_data.append("%s:" % key)
-            for value_key in values.keys():
-                metrics_data.append("%20s = %s" % (value_key, values[value_key]))
+            if values.keys() != {"events"}:
+                metrics_data.append("%s:" % key)
+                for value_key in values.keys():
+                    if value_key != "events":
+                        metrics_data.append("%20s = %s" % (value_key, values[value_key]))
         metrics_data.append("")
+
+        # Add events
+        for key in metrics.keys():
+            for event in metrics[key].get("events", []):
+                dt = datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds=event.time)
+                metrics_data.append("== %s ===================================" %
+                                    dt.strftime("%Y-%m-%d %H:%M:%S"))
+
+                metrics_data.append("%s:" % key)
+
+                for field, value in event.values.items():
+                    metrics_data.append("%20s = %s" % (field, value))
+
+                metrics_data.append("")
+
         return metrics_data

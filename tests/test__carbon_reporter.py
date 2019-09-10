@@ -44,6 +44,8 @@ class TestCarbonReporter(TimedTestCase):
             c2.dec()
             c2.dec()
             self.clock.add(1)
+        e1 = self.registry.event("e1")
+        e1.add({"field": 1})
 
     def test_report_now_plain(self):
         r = CarbonReporter(
@@ -60,6 +62,7 @@ class TestCarbonReporter(TimedTestCase):
                 "counter-2.count -2 2",
                 "c1.count 1 2",
                 "gsimple.value 42 2",
+                "e1.field 1 2",
                 "gcb.value 123 2",
                 "t1.1m_rate 0 2",
                 "t1.999_percentile 1 2",

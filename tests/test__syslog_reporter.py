@@ -1,9 +1,8 @@
-import mock
+from unittest import mock
+
 from pyformance import MetricsRegistry
 from pyformance.reporters.syslog_reporter import SysLogReporter
 from tests import TimedTestCase
-import logging
-import socket
 
 
 class TestSysLogReporter(TimedTestCase):
@@ -30,6 +29,8 @@ class TestSysLogReporter(TimedTestCase):
         t1 = self.registry.timer("t1")
         m1 = self.registry.meter("m1")
         m1.mark()
+        e1 = self.registry.event("e1")
+        e1.add({"field": 1})
         with t1.time():
             c1 = self.registry.counter("c1")
             c2 = self.registry.counter("counter-2")
@@ -38,9 +39,13 @@ class TestSysLogReporter(TimedTestCase):
             c2.dec()
             self.clock.add(1)
         with mock.patch(
-            "pyformance.reporters.syslog_reporter.logging.Logger.info"
+                "pyformance.reporters.syslog_reporter.logging.Logger.info"
         ) as patch:
             r.report_now()
+
+            self.assertEqual(patch.call_count, 2)
+            calls = patch.call_args_list
+
             expected = (
                 '{"c1.count": 1, "counter-2.count": -2, '
                 '"gcb.value": 123, "gsimple.value": 42, '
@@ -55,8 +60,13 @@ class TestSysLogReporter(TimedTestCase):
                 '"t1.avg": 1.0, "t1.count": 1.0, "t1.max": 1, "t1.mean_rate": 1.0, '
                 '"t1.min": 1, "t1.std_dev": 0.0, "t1.sum": 1.0, "timestamp": 1}'
             )
- 
-            patch.assert_called_with(expected)
+
+            # First call should be event free because events are reported based on submission
+            # rather than report timestamp. And a single line contains a single timestamp.
+            self.assertEqual(calls[0][0][0], expected)
+
+            # Second call should only be events
+            self.assertEqual(calls[1][0][0], '{"e1.field": 1, "timestamp": 0}')
 
 
 if __name__ == "__main__":
