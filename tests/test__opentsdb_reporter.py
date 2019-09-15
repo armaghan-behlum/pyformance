@@ -1,9 +1,7 @@
-import os
-import socket
-import mock
+from unittest import mock
 
-from pyformance.reporters.opentsdb_reporter import OpenTSDBReporter
 from pyformance import MetricsRegistry
+from pyformance.reporters.opentsdb_reporter import OpenTSDBReporter
 from tests import TimedTestCase
 
 
@@ -32,6 +30,8 @@ class TestOpenTSDBReporter(TimedTestCase):
         t1 = self.registry.timer("t1")
         m1 = self.registry.meter("m1")
         m1.mark()
+        e1 = self.registry.event("e1")
+        e1.add({"field1": 1, "field2": 2})
         with t1.time():
             c1 = self.registry.counter("c1")
             c2 = self.registry.counter("counter-2")
@@ -40,7 +40,8 @@ class TestOpenTSDBReporter(TimedTestCase):
             c2.dec()
             self.clock.add(1)
         output = r._collect_metrics(registry=self.registry)
-        self.assertEqual(len(output), 31)
+
+        self.assertEqual(len(output), 33)
         for data in output:
             assert data["metric"].startswith("prefix.")
 
@@ -68,7 +69,7 @@ class TestOpenTSDBReporter(TimedTestCase):
             c2.dec()
             self.clock.add(1)
         with mock.patch(
-            "pyformance.reporters.opentsdb_reporter.urllib.urlopen"
+                "pyformance.reporters.opentsdb_reporter.urllib.urlopen"
         ) as patch:
             r.report_now()
             patch.assert_called()

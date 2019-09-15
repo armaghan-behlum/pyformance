@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-import socket
-import sys
-import struct
-import pickle
 import contextlib
+import pickle
+import socket
+import struct
+import sys
+
 from six import iteritems
 
 from .reporter import Reporter
@@ -13,21 +14,20 @@ DEFAULT_CARBON_PORT = 2003
 
 
 class CarbonReporter(Reporter):
-
     """
     Carbon is the network daemon to collect metrics for Graphite
     """
 
     def __init__(
-        self,
-        registry=None,
-        reporting_interval=5,
-        prefix="",
-        server=DEFAULT_CARBON_SERVER,
-        port=DEFAULT_CARBON_PORT,
-        socket_factory=socket.socket,
-        clock=None,
-        pickle_protocol=False,
+            self,
+            registry=None,
+            reporting_interval=5,
+            prefix="",
+            server=DEFAULT_CARBON_SERVER,
+            port=DEFAULT_CARBON_PORT,
+            socket_factory=socket.socket,
+            clock=None,
+            pickle_protocol=False,
     ):
         super(CarbonReporter, self).__init__(registry, reporting_interval, clock)
         self.prefix = prefix
@@ -55,7 +55,7 @@ class CarbonReporter(Reporter):
                         (timestamp, metric_value),
                     )
                     for metric_name, metric in iteritems(metrics)
-                    for metric_key, metric_value in iteritems(metric)
+                    for metric_key, metric_value in iteritems(metric) if metric_key != "events"
                 ],
                 protocol=2,
             )
@@ -65,14 +65,27 @@ class CarbonReporter(Reporter):
             metrics_data = []
             for metric_name, metric in iteritems(metrics):
                 for metric_key, metric_value in iteritems(metric):
-                    metric_line = "%s%s.%s %s %s\n" % (
-                        self.prefix,
-                        metric_name,
-                        metric_key,
-                        metric_value,
-                        timestamp,
-                    )
-                    metrics_data.append(metric_line)
+                    if metric_key != "events":
+                        metric_line = "%s%s.%s %s %s\n" % (
+                            self.prefix,
+                            metric_name,
+                            metric_key,
+                            metric_value,
+                            timestamp,
+                        )
+                        metrics_data.append(metric_line)
+                    else:
+                        for event in metric_value:
+                            for field, value in event.values.items():
+                                metric_line = "%s%s.%s %s %s\n" % (
+                                    self.prefix,
+                                    metric_name,
+                                    field,
+                                    value,
+                                    event.time,
+                                )
+
+                                metrics_data.append(metric_line)
             result = "".join(metrics_data)
             if sys.version_info[0] > 2:
                 return result.encode()
@@ -80,7 +93,6 @@ class CarbonReporter(Reporter):
 
 
 class UdpCarbonReporter(CarbonReporter):
-
     """
     The default CarbonReporter uses TCP.
     This sub-class uses UDP instead which might be unreliable but it is faster
@@ -90,6 +102,6 @@ class UdpCarbonReporter(CarbonReporter):
         metrics = self._collect_metrics(registry or self.registry, timestamp)
         if metrics:
             with contextlib.closing(
-                self.socket_factory(socket.AF_INET, socket.SOCK_DGRAM)
+                    self.socket_factory(socket.AF_INET, socket.SOCK_DGRAM)
             ) as sock:
                 sock.sendto(metrics, (self.server, self.port))

@@ -1,24 +1,29 @@
 # -*- coding: utf-8 -*-
-import sys
-import os
 import datetime
+import os
+
 from .reporter import Reporter
 
 
 class CsvReporter(Reporter):
-
     """
     Show metrics in comma-separated-files.
     Each metrics gets its own file
+
+    This reporter is too primitive to support events because a single event
+    can have multiple fields, as it stands right now the values of the events will interleave
+    making the output completely useless.
+
+    For this reason events are ignored from the output of this reporter.
     """
 
     def __init__(
-        self,
-        registry=None,
-        reporting_interval=30,
-        path=None,
-        separator="\t",
-        clock=None,
+            self,
+            registry=None,
+            reporting_interval=30,
+            path=None,
+            separator="\t",
+            clock=None,
     ):
         super(CsvReporter, self).__init__(registry, reporting_interval, clock)
         self.path = path or os.getcwd()

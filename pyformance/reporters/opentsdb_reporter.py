@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-import sys
-from .reporter import Reporter
+
 import base64
 import json
+import sys
+
+from .reporter import Reporter
 
 if sys.version_info[0] > 2:
     import urllib.request as urllib
-    import urllib.error as urlerror
 else:
     import urllib2 as urllib
-    import urllib2 as urlerror
 
 
 class OpenTSDBReporter(Reporter):
@@ -19,15 +19,15 @@ class OpenTSDBReporter(Reporter):
     """
 
     def __init__(
-        self,
-        application_name,
-        write_key,
-        url,
-        registry=None,
-        reporting_interval=10,
-        clock=None,
-        prefix="",
-        tags={},
+            self,
+            application_name,
+            write_key,
+            url,
+            registry=None,
+            reporting_interval=10,
+            clock=None,
+            prefix="",
+            tags={},
     ):
         super(OpenTSDBReporter, self).__init__(
             registry=registry, reporting_interval=reporting_interval, clock=clock
@@ -64,12 +64,25 @@ class OpenTSDBReporter(Reporter):
         metrics_data = []
         for key in metrics.keys():
             for value_key in metrics[key].keys():
-                metrics_data.append(
-                    {
-                        "metric": "{0}{1}.{2}".format(self.prefix, key, value_key),
-                        "value": metrics[key][value_key],
-                        "timestamp": timestamp,
-                        "tags": self.tags,
-                    }
-                )
+                # Special case for handling events
+                if value_key == "events":
+                    for event in metrics[key]["events"]:
+                        for field_name, value in event.values.items():
+                            metrics_data.append(
+                                {
+                                    "metric": "{0}{1}.{2}".format(self.prefix, key, field_name),
+                                    "value": value,
+                                    "timestamp": event.time,
+                                    "tags": self.tags,
+                                }
+                            )
+                else:
+                    metrics_data.append(
+                        {
+                            "metric": "{0}{1}.{2}".format(self.prefix, key, value_key),
+                            "value": metrics[key][value_key],
+                            "timestamp": timestamp,
+                            "tags": self.tags,
+                        }
+                    )
         return metrics_data

@@ -1,12 +1,15 @@
-import mock
+try:
+    import mock
+except ImportError:
+    from unittest import mock
 
 try:
     from urllib2 import Request
 except ImportError:
     from urllib.request import Request
 
+from pyformance import MetricsRegistry, MarkInt
 from pyformance.reporters.influx import InfluxReporter, _format_tag_value
-from pyformance import MetricsRegistry
 from tests import TimedTestCase
 
 
@@ -71,7 +74,7 @@ class TestInfluxReporter(TimedTestCase):
             send_mock.assert_called_once_with(expected_url, expected_data)
 
     def test_gauge_with_global_tags(self):
-        tags = {"region": "us - west"}
+        tags = {"region": "us-west-2"}
         self.registry.gauge(key="cpu", tags=tags).set_value(65)
         influx_reporter = InfluxReporter(
             registry=self.registry,
@@ -85,7 +88,7 @@ class TestInfluxReporter(TimedTestCase):
             influx_reporter.report_now()
 
             expected_url = "http://127.0.0.1:8086/write?db=metrics&precision=s"
-            expected_data = "cpu,region=us\\ -\\ west,stage=dev value=65 " + \
+            expected_data = "cpu,stage=dev,region=us-west-2 value=65 " + \
                             self.clock.time_string()
             send_mock.assert_called_once_with(expected_url, expected_data)
 
@@ -111,6 +114,56 @@ class TestInfluxReporter(TimedTestCase):
                             self.clock.time_string()
             send_mock.assert_called_once_with(expected_url, expected_data)
 
+    def test_events_with_tags(self):
+        tags = {"host": "server1"}
+        self.registry._clock = self.clock
+        event = self.registry.event(key="event", tags=tags)
+
+        event.add({"field": 1, "float": 0.12, "int": MarkInt(1)})
+
+        influx_reporter = InfluxReporter(
+            registry=self.registry,
+            clock=self.clock,
+            autocreate_database=False
+        )
+
+        with mock.patch.object(influx_reporter, "_try_send",
+                               wraps=influx_reporter._try_send) as send_mock:
+            influx_reporter.report_now()
+
+            expected_url = "http://127.0.0.1:8086/write?db=metrics&precision=s"
+            expected_data = "event,host=server1 field=1,float=0.12,int=1i " + \
+                            self.clock.time_string()
+            send_mock.assert_called_once_with(expected_url, expected_data)
+
+    def test_combined_events_with_counter(self):
+        tags = {"host": "server1"}
+        self.registry._clock = self.clock
+        event = self.registry.event(key="event", tags=tags)
+
+        event.add({"field": 1})
+
+        counter = self.registry.counter("event", tags=tags)
+        counter.inc(5)
+
+        influx_reporter = InfluxReporter(
+            registry=self.registry,
+            clock=self.clock,
+            autocreate_database=False
+        )
+
+        with mock.patch.object(influx_reporter, "_try_send",
+                               wraps=influx_reporter._try_send) as send_mock:
+            influx_reporter.report_now()
+
+            expected_url = "http://127.0.0.1:8086/write?db=metrics&precision=s"
+            expected_data = [
+                "event,host=server1 count=5 " + self.clock.time_string(),
+                "event,host=server1 field=1 " + self.clock.time_string()
+            ]
+
+            send_mock.assert_called_once_with(expected_url, "\n".join(expected_data))
+
     def test_count_calls_with_tags(self):
         tags = {"host": "server1"}
         counter = self.registry.counter(key="cpu", tags=tags)
@@ -135,6 +188,6 @@ class TestInfluxReporter(TimedTestCase):
 
     def test__format_tag_value(self):
         self.assertEqual(_format_tag_value("no_special_chars"), "no_special_chars")
-        self.assertEqual(_format_tag_value("has space"), "has\ space")
-        self.assertEqual(_format_tag_value("has,comma"), "has\,comma")
-        self.assertEqual(_format_tag_value("has=equals"), "has\=equals")
+        self.assertEqual(_format_tag_value("has space"), "has\\ space")
+        self.assertEqual(_format_tag_value("has,comma"), "has\\,comma")
+        self.assertEqual(_format_tag_value("has=equals"), "has\\=equals")

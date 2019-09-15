@@ -1,17 +1,14 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function
+
 import json
 import os
 import socket
 import sys
-from pyformance.registry import set_global_registry, MetricsRegistry
 
-if sys.version_info[0] > 2:
-    import urllib.request as urllib
-    import urllib.error as urlerror
-else:
-    import urllib2 as urllib
-    import urllib2 as urlerror
+from pyformance.registry import MetricsRegistry, set_global_registry
+
+import urllib.request as urllib
+import urllib.error as urlerror
 
 from pyformance.__version__ import __version__
 
@@ -49,19 +46,26 @@ set_global_registry(NewRelicRegistry())
 class NewRelicReporter(Reporter):
     """
     Reporter for new relic
+
+    Newrelic reporter, as it is now, doesn't allow for reporting metrics on arbitrary
+    timestamp, meaning events cannot be supported as the event fields will be reported
+    to the timestamp of the report function rather than the even add timestamp.
+
+    This is not a big difference for some applications, but still events can not be supported
+    so they will be ignored.
     """
 
     MAX_METRICS_PER_REQUEST = 10000
     PLATFORM_URL = "https://platform-api.newrelic.com/platform/v1/metrics"
 
     def __init__(
-        self,
-        license_key,
-        registry=None,
-        name=socket.gethostname(),
-        reporting_interval=5,
-        prefix="",
-        clock=None,
+            self,
+            license_key,
+            registry=None,
+            name=socket.gethostname(),
+            reporting_interval=5,
+            prefix="",
+            clock=None,
     ):
         super(NewRelicReporter, self).__init__(registry, reporting_interval, clock)
         self.name = name

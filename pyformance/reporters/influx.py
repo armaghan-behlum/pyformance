@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 
-from six import iteritems
 import base64
 import logging
 import re
+
+from six import iteritems
 
 try:
     from urllib2 import quote, urlopen, Request, URLError
@@ -13,6 +14,7 @@ except ImportError:
     from urllib.request import urlopen, Request
 
 from .reporter import Reporter
+from ..mark_int import MarkInt
 from copy import copy
 
 LOG = logging.getLogger(__name__)
@@ -26,26 +28,25 @@ DEFAULT_INFLUX_PROTOCOL = "http"
 
 
 class InfluxReporter(Reporter):
-
     """
     InfluxDB reporter using native http api
     (based on https://influxdb.com/docs/v1.1/guides/writing_data.html)
     """
 
     def __init__(
-        self,
-        registry=None,
-        reporting_interval=5,
-        prefix="",
-        database=DEFAULT_INFLUX_DATABASE,
-        server=DEFAULT_INFLUX_SERVER,
-        username=DEFAULT_INFLUX_USERNAME,
-        password=DEFAULT_INFLUX_PASSWORD,
-        port=DEFAULT_INFLUX_PORT,
-        protocol=DEFAULT_INFLUX_PROTOCOL,
-        autocreate_database=False,
-        clock=None,
-        global_tags=None,
+            self,
+            registry=None,
+            reporting_interval=5,
+            prefix="",
+            database=DEFAULT_INFLUX_DATABASE,
+            server=DEFAULT_INFLUX_SERVER,
+            username=DEFAULT_INFLUX_USERNAME,
+            password=DEFAULT_INFLUX_PASSWORD,
+            port=DEFAULT_INFLUX_PORT,
+            protocol=DEFAULT_INFLUX_PROTOCOL,
+            autocreate_database=False,
+            clock=None,
+            global_tags=None,
     ):
         super(InfluxReporter, self).__init__(registry, reporting_interval, clock)
         self.prefix = prefix
@@ -105,8 +106,25 @@ class InfluxReporter(Reporter):
             table = self._get_table_name(metric_name)
             values = InfluxReporter._stringify_values(metric_values)
             tags = self._stringify_tags(key)
-            line = "%s%s %s %s" % (table, tags, values, timestamp)
-            lines.append(line)
+
+            # there's a special case where only events are present, which are skipped by
+            # _stringify_values function
+            if values:
+                line = "%s%s %s %s" % (table, tags, values, timestamp)
+                lines.append(line)
+
+            for event in metric_values.get("events", []):
+                values = InfluxReporter._stringify_values(event.values)
+
+                line = "%s%s %s %s" % (
+                    table,
+                    tags,
+                    values,
+                    int(round(event.time))
+                )
+
+                lines.append(line)
+
         return lines
 
     @staticmethod
@@ -114,7 +132,7 @@ class InfluxReporter(Reporter):
         return ",".join(
             [
                 "%s=%s" % (k, _format_field_value(v))
-                for (k, v) in iteritems(metric_values) if k != "tags"
+                for (k, v) in iteritems(metric_values) if k != "tags" and k != "events"
             ]
         )
 
@@ -153,10 +171,21 @@ class InfluxReporter(Reporter):
             response = urlopen(request)
             response.read()
         except URLError as err:
-            LOG.warning("Cannot write to %s: %s", self.server, err.reason)
+            response = err.read().decode("utf-8")
+
+            LOG.warning(
+                "Cannot write to %s: %s ,url: %s, data: %s, response: %s",
+                self.server,
+                err.reason,
+                url,
+                data,
+                response
+            )
 
 
 def _format_field_value(value):
+    if isinstance(value, MarkInt):
+        return f"{value.value}i"
     if type(value) is not str:
         return value
     else:

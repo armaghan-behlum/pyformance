@@ -17,8 +17,7 @@ setup(
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
-        "Programming Language :: Python :: 2.7",
-        "Programming Language :: Python :: 3.4",
+        "Programming Language :: Python :: 3.7",
     ],
     description="Performance metrics, based on Coda Hale's Yammer metrics",
     license="Apache 2.0",
