@@ -21,20 +21,20 @@ class TestInfluxReporter(TimedTestCase):
     def tearDown(self):
         super(TestInfluxReporter, self).tearDown()
 
-    def test_report_now(self):
+    def test_not_called_on_blank(self):
         influx_reporter = InfluxReporter(registry=self.registry)
 
         with mock.patch("pyformance.reporters.influx.urlopen") as patch:
             influx_reporter.report_now()
-            patch.assert_called()
+            patch.assert_not_called()
 
     def test_create_database(self):
         r1 = InfluxReporter(registry=self.registry, autocreate_database=True)
         with mock.patch("pyformance.reporters.influx.urlopen") as patch:
             r1.report_now()
-            if patch.call_count != 2:
+            if patch.call_count != 1:
                 raise AssertionError(
-                    "Expected 2 calls to 'urlopen'. Received: {}".format(
+                    "Expected 1 calls to 'urlopen'. Received: {}".format(
                         patch.call_count
                     )
                 )
@@ -47,8 +47,7 @@ class TestInfluxReporter(TimedTestCase):
             autocreate_database=False
         )
 
-        with mock.patch.object(influx_reporter, "_try_send",
-                               wraps=influx_reporter._try_send) as send_mock:
+        with mock.patch.object(influx_reporter, "_try_send") as send_mock:
             influx_reporter.report_now()
 
             expected_url = "http://127.0.0.1:8086/write?db=metrics&precision=s"
@@ -64,8 +63,7 @@ class TestInfluxReporter(TimedTestCase):
             autocreate_database=False
         )
 
-        with mock.patch.object(influx_reporter, "_try_send",
-                               wraps=influx_reporter._try_send) as send_mock:
+        with mock.patch.object(influx_reporter, "_try_send") as send_mock:
             influx_reporter.report_now()
 
             expected_url = "http://127.0.0.1:8086/write?db=metrics&precision=s"
@@ -83,8 +81,7 @@ class TestInfluxReporter(TimedTestCase):
             global_tags={"stage": "dev", "region": "override"}
         )
 
-        with mock.patch.object(influx_reporter, "_try_send",
-                               wraps=influx_reporter._try_send) as send_mock:
+        with mock.patch.object(influx_reporter, "_try_send") as send_mock:
             influx_reporter.report_now()
 
             expected_url = "http://127.0.0.1:8086/write?db=metrics&precision=s"
@@ -105,8 +102,7 @@ class TestInfluxReporter(TimedTestCase):
             autocreate_database=False
         )
 
-        with mock.patch.object(influx_reporter, "_try_send",
-                               wraps=influx_reporter._try_send) as send_mock:
+        with mock.patch.object(influx_reporter, "_try_send") as send_mock:
             influx_reporter.report_now()
 
             expected_url = "http://127.0.0.1:8086/write?db=metrics&precision=s"
@@ -127,8 +123,7 @@ class TestInfluxReporter(TimedTestCase):
             autocreate_database=False
         )
 
-        with mock.patch.object(influx_reporter, "_try_send",
-                               wraps=influx_reporter._try_send) as send_mock:
+        with mock.patch.object(influx_reporter, "_try_send") as send_mock:
             influx_reporter.report_now()
 
             expected_url = "http://127.0.0.1:8086/write?db=metrics&precision=s"
@@ -152,8 +147,7 @@ class TestInfluxReporter(TimedTestCase):
             autocreate_database=False
         )
 
-        with mock.patch.object(influx_reporter, "_try_send",
-                               wraps=influx_reporter._try_send) as send_mock:
+        with mock.patch.object(influx_reporter, "_try_send") as send_mock:
             influx_reporter.report_now()
 
             expected_url = "http://127.0.0.1:8086/write?db=metrics&precision=s"
@@ -177,8 +171,7 @@ class TestInfluxReporter(TimedTestCase):
             autocreate_database=False
         )
 
-        with mock.patch.object(influx_reporter, "_try_send",
-                               wraps=influx_reporter._try_send) as send_mock:
+        with mock.patch.object(influx_reporter, "_try_send") as send_mock:
             influx_reporter.report_now()
 
             expected_url = "http://127.0.0.1:8086/write?db=metrics&precision=s"
