@@ -89,9 +89,13 @@ class InfluxReporter(Reporter):
             self._create_database()
         timestamp = timestamp or int(round(self.clock.time()))
         metrics = (registry or self.registry).dump_metrics(key_is_metric=True)
-        post_data = "\n".join(self._get_influx_protocol_lines(metrics, timestamp))
-        url = self._get_url()
-        self._try_send(url, post_data)
+
+        influx_lines = self._get_influx_protocol_lines(metrics, timestamp)
+        # If you don't have anything nice to say than don't say nothing
+        if influx_lines:
+            post_data = "\n".join(influx_lines)
+            url = self._get_url()
+            self._try_send(url, post_data)
 
     def _get_table_name(self, metric_key):
         if not self.prefix:
