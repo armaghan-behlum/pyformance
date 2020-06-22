@@ -114,7 +114,7 @@ class InfluxReporter(Reporter):
             # there's a special case where only events are present, which are skipped by
             # _stringify_values function
             if values:
-                line = "%s%s %s %s" % (table, tags, values, timestamp)
+                line = "%s,%s %s %s" % (table, tags, values, timestamp)
                 lines.append(line)
 
             for event in metric_values.get("events", []):
@@ -150,7 +150,7 @@ class InfluxReporter(Reporter):
         all_tags.update(tags)
 
         if all_tags:
-            return "," + ",".join(
+            return ",".join(
                 [
                     "%s=%s" % (k, _format_tag_value(v))
                     for (k, v) in iteritems(all_tags)
