@@ -1,3 +1,10 @@
+# AlphaHealth Fork Notes
+
+Fork of a fork (https://github.com/Lightricks/pyformance) of https://github.com/omergertel/pyformance. 
+* The original library is a high-level metrics library for python. 
+* The Lightricks fork adds some useful tagging features. 
+* This alphahealth fork fixes a bug where all metrics were getting tagged with an empty tag ''
+
 # PyFormance
 
     pip install pyformance
