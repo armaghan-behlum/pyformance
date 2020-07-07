@@ -8,7 +8,7 @@ class BaseMetric(object):
         # can't have spaces or commas in metric name and tags
         self.key = self._clean(key)
         self.tags = {}
-        for key, value in (tags or {}):
+        for key, value in (tags or {}).items():
             self[self._clean(key)] = value
 
     def _clean(self, value: str):
