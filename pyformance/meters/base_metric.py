@@ -9,7 +9,7 @@ class BaseMetric(object):
         self.key = self._clean(key)
         self.tags = {}
         for key, value in (tags or {}).items():
-            self[self._clean(key)] = value
+            self.tags[self._clean(key)] = value
 
     def _clean(self, value: str):
         if value:
