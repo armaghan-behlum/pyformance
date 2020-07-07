@@ -5,11 +5,10 @@ class BaseMetric(object):
     """
 
     def __init__(self, key, tags=None):
-        # can't have spaces or commas in metric name and tags
+        # can't have spaces or commas in metric name
+        # okay to have in tags
         self.key = self._clean(key)
-        self.tags = {}
-        for key, value in (tags or {}).items():
-            self.tags[self._clean(key)] = value
+        self.tags = tags or {}
 
     def _clean(self, value: str):
         if value:
