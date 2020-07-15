@@ -3,6 +3,7 @@ from threading import Thread, Event
 import six
 from ..registry import global_registry
 from ..decorators import get_qualname
+import atexit
 
 
 class Reporter(object):
@@ -20,6 +21,7 @@ class Reporter(object):
         self.clock = clock or time
         self._stopped = Event()
         self.create_thread()
+        self._report_count = 0
 
     def start(self):
         if self._stopped.is_set():
@@ -41,11 +43,13 @@ class Reporter(object):
 
     def _loop(self):
         next_loop_time = time.time()
+        atexit.register(self.final_report)
         while not self._stopped.is_set():
             try:
                 self.report_now(self.registry)
             except:
                 pass
+            self._report_count += 1
             next_loop_time += self.reporting_interval
             wait = max(0, next_loop_time - time.time())
             if six.PY2:
@@ -54,7 +58,18 @@ class Reporter(object):
                 # wait is faster/better in Python 3
                 # See http://stackoverflow.com/questions/29082268/python-time-sleep-vs-event-wait
                 break  # true if timeout
+        atexit.unregister(self.final_report)
         # self._stopped.clear()
+
+    def final_report(self):
+        """
+        pauses exit until the next report gets sent, makes it so we don't miss data at the end of a run
+        max wait of 30s, on the off chance you have a weirdly long reporting interval
+        """
+        reports_so_far = self._report_count
+        start_time = time.time()
+        while not self._stopped.is_set() and self._report_count == reports_so_far and time.time() - start_time < 30:
+            time.sleep(.1)
 
     def report_now(self, registry=None, timestamp=None):
         raise NotImplementedError(self.report_now)
