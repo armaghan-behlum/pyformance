@@ -47,11 +47,10 @@ class SimpleGauge(Gauge):
     A gauge which holds values with simple getter- and setter-interface
     """
 
-    def __init__(self, key, value=float("nan"), tags=None):
+    def __init__(self, key, tags=None):
         "constructor accepts initial value"
         super(SimpleGauge, self).__init__(key, tags)
         self.values = {}
-        self.values["value"] = value
 
     def get_value(self):
         "getter returns current value"
