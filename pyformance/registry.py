@@ -90,13 +90,12 @@ class MetricsRegistry(object):
             self._histograms[metric_key] = Histogram(key=key, clock=self._clock, tags=tags)
         return self._histograms[metric_key]
 
-    def gauge(self, key, gauge=None, default=float("nan"), tags=None):
+    def gauge(self, key, gauge=None, tags=None):
         metric_key = BaseMetric(key, tags)
         if metric_key not in self._gauges:
             if gauge is None:
                 gauge = SimpleGauge(
                     key=key,
-                    value=default,
                     tags=tags
                 )  # raise TypeError("gauge required for registering")
             elif not isinstance(gauge, Gauge):
@@ -182,7 +181,7 @@ class MetricsRegistry(object):
     def _get_gauge_metrics(self, metric_key):
         if metric_key in self._gauges:
             gauge = self._gauges[metric_key]
-            result = {"value": gauge.get_value()}
+            result = gauge.get_as_dictionary()
             return result
         return {}
 
