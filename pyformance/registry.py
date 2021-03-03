@@ -182,7 +182,7 @@ class MetricsRegistry(object):
     def _get_gauge_metrics(self, metric_key):
         if metric_key in self._gauges:
             gauge = self._gauges[metric_key]
-            result = {"value": gauge.get_value()}
+            result = gauge.get_as_dictionary()
             return result
         return {}
 

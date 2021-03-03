@@ -22,6 +22,8 @@ class Gauge(BaseMetric):
         "A subclass of Gauge should implement this method"
         raise NotImplementedError()
 
+    def get_as_dictionary(self):
+        return {"value": self.get_value()}
 
 class CallbackGauge(Gauge):
 
@@ -48,13 +50,17 @@ class SimpleGauge(Gauge):
     def __init__(self, key, value=float("nan"), tags=None):
         "constructor accepts initial value"
         super(SimpleGauge, self).__init__(key, tags)
-        self._value = value
+        self.values = {}
+        self.values["value"] = value
 
     def get_value(self):
         "getter returns current value"
-        return self._value
+        return self.values["value"]
 
-    def set_value(self, value):
+    def set_value(self, value, field_name="value"):
         "setter changes current value"
         # XXX: add locking?
-        self._value = value
+        self.values[field_name] = value
+
+    def get_as_dictionary(self):
+        return self.values
