@@ -120,7 +120,7 @@ class InfluxReporter(Reporter):
             for event in metric_values.get("events", []):
                 values = InfluxReporter._stringify_values(event.values)
 
-                line = "%s%s %s %s" % (
+                line = "%s,%s %s %s" % (
                     table,
                     tags,
                     values,
